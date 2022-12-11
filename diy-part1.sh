@@ -29,12 +29,12 @@
 # sed -i 's/\/bin\/ash/\/usr\/bin\/zsh/g' package/base-files/files/etc/passwd
 
 # 移除重复软件包
-rm -rf feeds/packages/net/mosdns
-rm -rf feeds/luci/themes/luci-theme-argon
-rm -rf feeds/luci/themes/luci-theme-netgear
-rm -rf feeds/luci/applications/luci-app-netdata
-rm -rf feeds/luci/applications/luci-app-wrtbwmon
-rm -rf feeds/luci/applications/luci-app-dockerman
+# rm -rf feeds/packages/net/mosdns
+# rm -rf feeds/luci/themes/luci-theme-argon
+# rm -rf feeds/luci/themes/luci-theme-netgear
+# rm -rf feeds/luci/applications/luci-app-netdata
+# rm -rf feeds/luci/applications/luci-app-wrtbwmon
+# rm -rf feeds/luci/applications/luci-app-dockerman
 
 # 添加额外软件包
 echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
@@ -50,6 +50,10 @@ echo 'src-git kenzok8 https://github.com/kenzok8/openwrt-packages' >>feeds.conf.
 # svn co https://github.com/Lienol/openwrt-package/trunk/luci-app-filebrowser package/luci-app-filebrowser
 # svn co https://github.com/lisaac/luci-app-dockerman/trunk/applications/luci-app-dockerman package/luci-app-dockerman
 # svn co https://github.com/immortalwrt/luci/branches/openwrt-18.06/applications/luci-app-eqos package/luci-app-eqos
+
+#添加smartdns
+git clone https://github.com/pymumu/openwrt-smartdns package/smartdns
+git clone -b lede https://github.com/pymumu/luci-app-smartdns.git package/luci-app-smartdns
 
 # 科学上网插件
 # git clone --depth 1 https://github.com/jerrykuku/luci-app-vssr package/luci-app-vssr
