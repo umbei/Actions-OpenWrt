@@ -11,7 +11,7 @@
 #
 
 # Modify default IP
-sed -i 's/192.168.1.1/10.0.0.252/g' package/base-files/files/bin/config_generate
+# sed -i 's/192.168.1.1/10.0.0.252/g' package/base-files/files/bin/config_generate
 
 # cat >$NETIP <<-EOF
 # uci set network.lan.ipaddr='10.0.0.252'                      # IPv4 地址(openwrt后台地址)
