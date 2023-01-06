@@ -29,7 +29,7 @@ sed -i 's/192.168.1.1/10.0.0.252/g' package/base-files/files/bin/config_generate
 # sed -i 's/\/bin\/ash/\/usr\/bin\/zsh/g' package/base-files/files/etc/passwd
 
 # Clear the login password
-# sed -i 's/$1$V4UetPzk$CYXluq4wUazHjmCDBCqXF.//g' openwrt/package/lean/default-settings/files/zzz-default-settings
+sed -i 's/$2y$10$8b2teWtbx8TqB0MnbeMxCepIDC1zDZ444whIeeIcsXgCv0ACWAzAq//g' openwrt/package/lean/default-settings/files/zzz-default-settings
 
 # 移除重复软件包
 # rm -rf feeds/packages/net/mosdns
@@ -40,14 +40,14 @@ sed -i 's/192.168.1.1/10.0.0.252/g' package/base-files/files/bin/config_generate
 # rm -rf feeds/luci/applications/luci-app-dockerman
 
 # 添加额外软件包
-echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
+# echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
 echo 'src-git passwall https://github.com/xiaorouji/openwrt-passwall' >>feeds.conf.default
-echo 'src-git kenzok8 https://github.com/kenzok8/openwrt-packages' >>feeds.conf.default
-# git clone --depth 1 https://github.com/kongfl888/luci-app-adguardhome package/luci-app-adguardhome
+# echo 'src-git kenzok8 https://github.com/kenzok8/openwrt-packages' >>feeds.conf.default
+git clone --depth 1 https://github.com/kongfl888/luci-app-adguardhome package/luci-app-adguardhome
 # git clone --depth 1 https://github.com/tty228/luci-app-serverchan package/luci-app-serverchan
 # git clone --depth 1 https://github.com/iwrt/luci-app-ikoolproxy package/luci-app-ikoolproxy
 # git clone --depth 1 https://github.com/esirplayground/luci-app-poweroff package/luci-app-poweroff
-# git clone --depth 1 https://github.com/destan19/OpenAppFilter package/OpenAppFilter
+git clone --depth 1 https://github.com/destan19/OpenAppFilter package/OpenAppFilter
 # git clone --depth 1 https://github.com/Jason6111/luci-app-netdata package/luci-app-netdata
 # git clone --depth 1 -b lede https://github.com/pymumu/luci-app-smartdns package/luci-app-smartdns
 # svn co https://github.com/Lienol/openwrt-package/trunk/luci-app-filebrowser package/luci-app-filebrowser
@@ -95,15 +95,15 @@ git clone -b lede https://github.com/pymumu/luci-app-smartdns.git package/luci-a
 # svn co https://github.com/fw876/helloworld/trunk/redsocks2 package/redsocks2
 
 # Themes
-git clone --depth 1 -b 18.06 https://github.com/kiddin9/luci-theme-edge package/luci-theme-edge
-git clone --depth 1 -b 18.06 https://github.com/jerrykuku/luci-theme-argon package/luci-theme-argon
-git clone --depth 1 https://github.com/jerrykuku/luci-app-argon-config package/luci-app-argon-config
-git clone --depth 1 https://github.com/thinktip/luci-theme-neobird package/luci-theme-neobird
-git clone --depth 1 https://github.com/xiaoqingfengATGH/luci-theme-infinityfreedom package/luci-theme-infinityfreedom
-svn co https://github.com/rosywrt/luci-theme-rosy/trunk/luci-theme-rosy package/luci-theme-rosy
-svn co https://github.com/haiibo/packages/trunk/luci-theme-atmaterial package/luci-theme-atmaterial
-svn co https://github.com/haiibo/packages/trunk/luci-theme-opentomcat package/luci-theme-opentomcat
-svn co https://github.com/haiibo/packages/trunk/luci-theme-netgear package/luci-theme-netgear
+# git clone --depth 1 -b 18.06 https://github.com/kiddin9/luci-theme-edge package/luci-theme-edge
+# git clone --depth 1 -b 18.06 https://github.com/jerrykuku/luci-theme-argon package/luci-theme-argon
+# git clone --depth 1 https://github.com/jerrykuku/luci-app-argon-config package/luci-app-argon-config
+# git clone --depth 1 https://github.com/thinktip/luci-theme-neobird package/luci-theme-neobird
+# git clone --depth 1 https://github.com/xiaoqingfengATGH/luci-theme-infinityfreedom package/luci-theme-infinityfreedom
+# svn co https://github.com/rosywrt/luci-theme-rosy/trunk/luci-theme-rosy package/luci-theme-rosy
+# svn co https://github.com/haiibo/packages/trunk/luci-theme-atmaterial package/luci-theme-atmaterial
+# svn co https://github.com/haiibo/packages/trunk/luci-theme-opentomcat package/luci-theme-opentomcat
+# svn co https://github.com/haiibo/packages/trunk/luci-theme-netgear package/luci-theme-netgear
 
 # 晶晨宝盒
 # svn co https://github.com/ophub/luci-app-amlogic/trunk/luci-app-amlogic package/luci-app-amlogic
@@ -120,8 +120,8 @@ svn co https://github.com/haiibo/packages/trunk/luci-theme-netgear package/luci-
 # svn co https://github.com/linkease/nas-packages/trunk/network/services/ddnsto package/ddnsto
 
 # 流量监控
-svn co https://github.com/haiibo/packages/trunk/luci-app-wrtbwmon package/luci-app-wrtbwmon
-svn co https://github.com/haiibo/packages/trunk/wrtbwmon package/wrtbwmon
+# svn co https://github.com/haiibo/packages/trunk/luci-app-wrtbwmon package/luci-app-wrtbwmon
+# svn co https://github.com/haiibo/packages/trunk/wrtbwmon package/wrtbwmon
 
 # Alist
 # svn co https://github.com/sbwml/luci-app-alist/trunk/luci-app-alist package/luci-app-alist
