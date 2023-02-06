@@ -59,6 +59,17 @@ jobs:
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
+        sudo gedit /etc/apt/sources.list
+        deb http://mirrors.163.com/ubuntu/ precise main universe restricted multiverse 
+        deb-src http://mirrors.163.com/ubuntu/ precise main universe restricted multiverse 
+        deb http://mirrors.163.com/ubuntu/ precise-security universe main multiverse restricted 
+        deb-src http://mirrors.163.com/ubuntu/ precise-security universe main multiverse restricted 
+        deb http://mirrors.163.com/ubuntu/ precise-updates universe main multiverse restricted 
+        deb http://mirrors.163.com/ubuntu/ precise-proposed universe main multiverse restricted 
+        deb-src http://mirrors.163.com/ubuntu/ precise-proposed universe main multiverse restricted 
+        deb http://mirrors.163.com/ubuntu/ precise-backports universe main multiverse restricted 
+        deb-src http://mirrors.163.com/ubuntu/ precise-backports universe main multiverse restricted 
+        deb-src http://mirrors.163.com/ubuntu/ precise-updates universe main multiverse restricted
         sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
         sudo -E apt-get -qq update
         sudo -E apt-get -qq full-upgrade -y
