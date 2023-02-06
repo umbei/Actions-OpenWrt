@@ -59,7 +59,7 @@ jobs:
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-        sudo gedit /etc/apt/sources.list
+        sudo gedit openwrt/etc/apt/sources.list
         deb http://mirrors.163.com/ubuntu/ precise main universe restricted multiverse 
         deb-src http://mirrors.163.com/ubuntu/ precise main universe restricted multiverse 
         deb http://mirrors.163.com/ubuntu/ precise-security universe main multiverse restricted 
