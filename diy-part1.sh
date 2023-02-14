@@ -29,7 +29,7 @@ sed -i 's/192.168.1.1/10.0.0.252/g' package/base-files/files/bin/config_generate
 # sed -i 's/\/bin\/ash/\/usr\/bin\/zsh/g' package/base-files/files/etc/passwd
 
 # Clear the login password
-sed -i "/CYXluq4wUazHjmCDBCqXF/d" package/lean/default-settings/files/zzz-default-settings
+# sed -i "/CYXluq4wUazHjmCDBCqXF/d" package/lean/default-settings/files/zzz-default-settings
 
 # 移除重复软件包
 # rm -rf feeds/packages/net/mosdns
@@ -42,7 +42,7 @@ sed -i "/CYXluq4wUazHjmCDBCqXF/d" package/lean/default-settings/files/zzz-defaul
 # 添加额外软件包
 # echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
 echo 'src-git passwall https://github.com/xiaorouji/openwrt-passwall' >>feeds.conf.default
-echo 'src-git passwall2 https://github.com/xiaorouji/openwrt-passwall2' >>feeds.conf.default
+# echo 'src-git passwall2 https://github.com/xiaorouji/openwrt-passwall2' >>feeds.conf.default
 git clone https://github.com/kenzok8/openwrt-packages.git package/openwrt-packages
 # echo 'src-git kenzok8 https://github.com/kenzok8/openwrt-packages' >>feeds.conf.default
 git clone --depth 1 https://github.com/kongfl888/luci-app-adguardhome package/luci-app-adguardhome
