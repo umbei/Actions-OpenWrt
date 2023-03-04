@@ -44,7 +44,7 @@ sed -i 's/192.168.1.1/10.0.0.252/g' package/base-files/files/bin/config_generate
 echo 'src-git passwall https://github.com/xiaorouji/openwrt-passwall' >>feeds.conf.default
 # echo 'src-git passwall2 https://github.com/xiaorouji/openwrt-passwall2' >>feeds.conf.default
 # git clone https://github.com/kenzok8/openwrt-packages.git package/openwrt-packages
-echo 'src-git kenzok8 https://github.com/kenzok8/openwrt-packages' >>feeds.conf.default
+# echo 'src-git kenzok8 https://github.com/kenzok8/openwrt-packages' >>feeds.conf.default
 # git clone --depth 1 https://github.com/kongfl888/luci-app-adguardhome package/luci-app-adguardhome
 # git clone --depth 1 https://github.com/tty228/luci-app-serverchan package/luci-app-serverchan
 # git clone --depth 1 https://github.com/iwrt/luci-app-ikoolproxy package/luci-app-ikoolproxy
@@ -57,8 +57,8 @@ git clone --depth 1 https://github.com/destan19/OpenAppFilter package/OpenAppFil
 # svn co https://github.com/immortalwrt/luci/branches/openwrt-18.06/applications/luci-app-eqos package/luci-app-eqos
 
 #添加smartdns
-# git clone https://github.com/pymumu/openwrt-smartdns package/smartdns
-# git clone -b lede https://github.com/pymumu/luci-app-smartdns.git package/luci-app-smartdns
+git clone https://github.com/pymumu/openwrt-smartdns package/smartdns
+git clone -b lede https://github.com/pymumu/luci-app-smartdns.git package/luci-app-smartdns
 
 # 科学上网插件
 # git clone --depth 1 https://github.com/jerrykuku/luci-app-vssr package/luci-app-vssr
@@ -102,7 +102,7 @@ git clone --depth 1 https://github.com/destan19/OpenAppFilter package/OpenAppFil
 # git clone --depth 1 https://github.com/jerrykuku/luci-app-argon-config package/luci-app-argon-config
 # git clone --depth 1 https://github.com/thinktip/luci-theme-neobird package/luci-theme-neobird
 # git clone --depth 1 https://github.com/xiaoqingfengATGH/luci-theme-infinityfreedom package/luci-theme-infinityfreedom
-# svn co https://github.com/rosywrt/luci-theme-rosy/trunk/luci-theme-rosy package/luci-theme-rosy
+svn co https://github.com/rosywrt/luci-theme-rosy/trunk/luci-theme-rosy package/luci-theme-rosy
 # svn co https://github.com/haiibo/packages/trunk/luci-theme-atmaterial package/luci-theme-atmaterial
 # svn co https://github.com/haiibo/packages/trunk/luci-theme-opentomcat package/luci-theme-opentomcat
 # svn co https://github.com/haiibo/packages/trunk/luci-theme-netgear package/luci-theme-netgear
@@ -143,9 +143,9 @@ git clone --depth 1 https://github.com/destan19/OpenAppFilter package/OpenAppFil
 # sed -i '/nlbwmon/a\uci commit nlbwmon' package/lean/default-settings/files/zzz-default-settings
 
 # 修改版本为编译日期
-date_version=$(date +"%Y.%m.%d")
-orig_version=$(cat "package/lean/default-settings/files/zzz-default-settings" | grep DISTRIB_REVISION= | awk -F "'" '{print $2}')
-sed -i "s/${orig_version}/R${date_version} by umbei/g" package/lean/default-settings/files/zzz-default-settings
+# date_version=$(date +"%Y.%m.%d")
+# orig_version=$(cat "package/lean/default-settings/files/zzz-default-settings" | grep DISTRIB_REVISION= | awk -F "'" '{print $2}')
+# sed -i "s/${orig_version}/R${date_version} by umbei/g" package/lean/default-settings/files/zzz-default-settings
 
 # 调整 x86 型号只显示 CPU 型号
 sed -i '/h=${g}.*/d' package/lean/autocore/files/x86/autocore
