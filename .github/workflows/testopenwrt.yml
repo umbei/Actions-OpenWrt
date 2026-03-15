@@ -1,36 +1,27 @@
-# 工作流名称（GitHub Actions 页面显示）
-name: Build OpenWrt lede
+# Build OpenWrt for x86_64 (Lean's lede)
+name: Build OpenWrt x86_64 (Lean's lede)
 
-# 触发条件：手动触发 + 定时触发（可选）
- on:
-  workflow_dispatch:  # 手动触发（核心，必选）
+on:
+  workflow_dispatch:
   schedule:
-    #- cron: '0 8 * * 0'  # 每周日 8 点 UTC 自动触发（可选，注释掉则仅手动触发）
+    - cron: '0 8 * * 0'
 
-# 权限配置（必须，否则无法上传产物）
 permissions:
   contents: write
 
-# 工作流任务
 jobs:
   build:
-    # 运行环境：GitHub 官方 Ubuntu 22.04（OpenWrt 编译推荐）
     runs-on: ubuntu-22.04
-    
-    # 步骤定义
     steps:
-      # 步骤1：检出仓库代码（含 .config、diy 脚本）
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1  # 仅拉取最新代码，加快速度
+          fetch-depth: 1
 
-      # 步骤2：初始化编译环境（安装依赖）
       - name: Initialization environment
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          # 更新系统并安装编译依赖
           sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
           sudo apt update -y
           sudo apt full-upgrade -y
@@ -40,89 +31,72 @@ jobs:
             libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libreadline-dev libssl-dev libtool lrzsz \
             mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pip qemu-utils \
             rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
-          # 清理缓存，释放空间
           sudo apt autoremove -y && sudo apt clean -y
-          # 设置时区（避免编译时间异常）
           sudo timedatectl set-timezone Asia/Shanghai
 
-      # 步骤3：下载 Lean's lede 源码
-      - name: Download Lean's lede source code
+      - name: Download Lean's lede source
         run: |
           git clone --depth=1 https://github.com/coolsnowwolf/lede.git openwrt
           cd openwrt
-          # 更新 feeds（核心，拉取插件源）
           ./scripts/feeds update -a
 
-      # 步骤4：执行自定义脚本（添加 Passwall/Lucky/SmartDNS 插件源）
-      - name: Run diy scripts (add plugins)
+      - name: Add custom plugins
         run: |
           cd openwrt
-          # 若仓库根目录有 diy-part1.sh，执行它（推荐将插件源写在 diy-part1.sh 中）
-          [ -f ../diy-part1.sh ] && bash ../diy-part1.sh
-          # 安装 feeds 插件
+          # Passwall
+          git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall-packages.git package/passwall-packages
+          git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall.git package/passwall
+          # Lucky
+          git clone --depth=1 https://github.com/gdy666/luci-app-lucky.git package/lucky
+          # SmartDNS
+          git clone --depth=1 https://github.com/pymumu/luci-app-smartdns.git package/smartdns
+          # Install feeds
           ./scripts/feeds install -a
 
-      # 步骤5：替换自定义 .config 配置文件
-      - name: Load custom .config
+      - name: Load custom config
         run: |
           cd openwrt
-          # 将仓库根目录的 .config 复制到源码目录
           [ -f ../.config ] && cp ../.config ./.config
-          # 自动补全 .config 中缺失的依赖（关键，避免编译报错）
           make defconfig
 
-      # 步骤6：下载编译依赖包（提前缓存，加快编译）
       - name: Download packages
         run: |
           cd openwrt
           make download -j8
-          find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
 
-      # 步骤7：开始编译 OpenWrt 固件
       - name: Compile OpenWrt
         run: |
           cd openwrt
-          # 查看 CPU 核心数，自动分配编译线程（避免卡死）
-          echo "Compiling OpenWrt firmware..."
-          make -j$(nproc) || make -j1 V=s  # 若多核编译失败，降级为单核并输出详细日志
-          # 检查编译产物是否存在
-          echo "Compile completed, checking firmware files..."
+          make -j$(nproc) || make -j1 V=s
           ls -lh bin/targets/x86/64/
 
-      # 步骤8：打包编译产物（便于下载）
-      - name: Package firmware files
+      - name: Package firmware
         run: |
-          # 创建产物目录
           mkdir -p firmware
-          # 复制固件到产物目录
           cp openwrt/bin/targets/x86/64/*.tar.gz firmware/
           cp openwrt/bin/targets/x86/64/*.img.gz firmware/
           cp openwrt/bin/targets/x86/64/*.iso firmware/
-          # 生成固件信息文件
           echo "Build Time: $(date +%Y-%m-%d_%H:%M:%S)" > firmware/build-info.txt
-          echo "Lean's lede Source: https://github.com/coolsnowwolf/lede" >> firmware/build-info.txt
-          echo "Target Platform: x86_64" >> firmware/build-info.txt
+          echo "Source: Lean's lede" >> firmware/build-info.txt
+          echo "Platform: x86_64" >> firmware/build-info.txt
 
-      # 步骤9：上传产物到 GitHub Artifacts（临时下载，保留90天）
-      - name: Upload firmware to Artifacts
+      - name: Upload to Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: OpenWrt_x86_64_Firmware_${{ github.run_id }}
+          name: OpenWrt_x86_64_${{ github.run_id }}
           path: firmware/
 
-      # 步骤10：（可选）发布固件到 GitHub Release（永久保存）
       - name: Release firmware
         uses: softprops/action-gh-release@v2
-        if: github.event_name != 'schedule'  # 定时触发不发布，仅手动触发发布
+        if: github.event_name != 'schedule'
         with:
           tag_name: OpenWrt_x86_64_${{ github.run_id }}
-          name: OpenWrt x86_64 Firmware ${{ github.run_id }}
+          name: OpenWrt x86_64 ${{ github.run_id }}
           body: |
             - 源码：Lean's lede
             - 平台：x86_64
-            - 集成插件：Passwall、SmartDNS、Lucky、Adbyby
-            - 编译时间：${{ github.run_at }}
+            - 插件：Passwall、SmartDNS、Lucky、Adbyby
           files: firmware/*
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # GitHub 自动生成的令牌，无需手动配置
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
