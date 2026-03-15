@@ -1,146 +1,128 @@
-# sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
-# Copyright (c) 2019-2020 P3TERX <https://p3terx.com>
-#
-# This is free software, licensed under the MIT License.
-# See /LICENSE for more information.
-#
-# https://github.com/P3TERX/Actions-OpenWrt
-# Description: Build OpenWrt using GitHub Actions
-#
+# 工作流名称（GitHub Actions 页面显示）
+name: Build OpenWrt for x86_64 (Lean's lede)
 
-name: TEST-lede
+# 触发条件：手动触发 + 定时触发（可选）
+# on:
+ # workflow_dispatch:  # 手动触发（核心，必选）
+  schedule:
+    - cron: '0 8 * * 0'  # 每周日 8 点 UTC 自动触发（可选，注释掉则仅手动触发）
 
-on:
-  repository_dispatch:
-  workflow_dispatch:
-    inputs:
-      ssh:
-        description: 'SSH connection to Actions'
-        required: false
-        default: 'true'
+# 权限配置（必须，否则无法上传产物）
+permissions:
+  contents: write
 
-env:
-  REPO_URL: https://github.com/umbei/lede
-  REPO_BRANCH: master
-  FEEDS_CONF: feeds.conf.default
-  CONFIG_FILE: .config
-  DIY_P1_SH: diy-part1.sh
-  DIY_P2_SH: diy-part2.sh
-  UPLOAD_BIN_DIR: false
-  UPLOAD_FIRMWARE: true
-  TZ: Asia/Shanghai
-
+# 工作流任务
 jobs:
   build:
-    runs-on: ubuntu-latest
-
+    # 运行环境：GitHub 官方 Ubuntu 22.04（OpenWrt 编译推荐）
+    runs-on: ubuntu-22.04
+    
+    # 步骤定义
     steps:
-    - name: Checkout
-      uses: actions/checkout@main
-      
-    - name: Check Server Performance
-      run: |
-        echo "警告?"
-        echo "分配的服务器性能有限，若选择的插件过多，务必注意CPU性能！"
-        echo -e "已知CPU型号（降序）：8370C，8272CL，8171M，E5-2673 \n"
-        echo "--------------------------CPU信息--------------------------"
-        echo "CPU物理数量：$(cat /proc/cpuinfo | grep "physical id" | sort | uniq | wc -l)"
-        echo -e "CPU核心信息：$(cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c) \n"
-        echo "--------------------------内存信息--------------------------"
-        echo "已安装内存详细信息："
-        echo -e "$(sudo lshw -short -C memory | grep GiB) \n"
-        echo "--------------------------硬盘信息--------------------------"
-        echo "硬盘数量：$(ls /dev/sd* | grep -v [1-9] | wc -l)" && df -hT
+      # 步骤1：检出仓库代码（含 .config、diy 脚本）
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1  # 仅拉取最新代码，加快速度
 
-    - name: Initialization environment
-      env:
-        DEBIAN_FRONTEND: noninteractive
-      run: |
-        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /etc/mysql /usr/local/lib/android
-        sudo -E apt-get -qq update
-        sudo -E apt-get -qq install $(curl -fsSL is.gd/depends_ubuntu_2204)
-        sudo -E apt-get -qq autoremove --purge
-        sudo -E apt-get -qq clean
-        sudo timedatectl set-timezone "$TZ"
-        
-    - name: Clone source code
-      working-directory: /workdir
-      run: |
-        df -hT $GITHUB_WORKSPACE
-        git clone $REPO_URL -b $REPO_BRANCH workspace/openwrt
-        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
+      # 步骤2：初始化编译环境（安装依赖）
+      - name: Initialization environment
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          # 更新系统并安装编译依赖
+          sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          sudo apt update -y
+          sudo apt full-upgrade -y
+          sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
+            bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib \
+            git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev \
+            libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libreadline-dev libssl-dev libtool lrzsz \
+            mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pip qemu-utils \
+            rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
+          # 清理缓存，释放空间
+          sudo apt autoremove -y && sudo apt clean -y
+          # 设置时区（避免编译时间异常）
+          sudo timedatectl set-timezone Asia/Shanghai
 
-    - name: Load custom feeds
-      run: |
-        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
-        chmod +x $DIY_P1_SH
-        cd openwrt
-        $GITHUB_WORKSPACE/$DIY_P1_SH
+      # 步骤3：下载 Lean's lede 源码
+      - name: Download Lean's lede source code
+        run: |
+          git clone --depth=1 https://github.com/coolsnowwolf/lede.git openwrt
+          cd openwrt
+          # 更新 feeds（核心，拉取插件源）
+          ./scripts/feeds update -a
 
-    - name: Update feeds
-      run: cd openwrt && ./scripts/feeds update -a
+      # 步骤4：执行自定义脚本（添加 Passwall/Lucky/SmartDNS 插件源）
+      - name: Run diy scripts (add plugins)
+        run: |
+          cd openwrt
+          # 若仓库根目录有 diy-part1.sh，执行它（推荐将插件源写在 diy-part1.sh 中）
+          [ -f ../diy-part1.sh ] && bash ../diy-part1.sh
+          # 安装 feeds 插件
+          ./scripts/feeds install -a
 
-    - name: Install feeds
-      run: cd openwrt && ./scripts/feeds install -a
+      # 步骤5：替换自定义 .config 配置文件
+      - name: Load custom .config
+        run: |
+          cd openwrt
+          # 将仓库根目录的 .config 复制到源码目录
+          [ -f ../.config ] && cp ../.config ./.config
+          # 自动补全 .config 中缺失的依赖（关键，避免编译报错）
+          make defconfig
 
-    - name: Load custom configuration
-      run: |
-        [ -e files ] && mv files openwrt/files
-        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
-        chmod +x $DIY_P2_SH
-        cd openwrt
-        $GITHUB_WORKSPACE/$DIY_P2_SH
+      # 步骤6：下载编译依赖包（提前缓存，加快编译）
+      - name: Download packages
+        run: |
+          cd openwrt
+          make download -j8
+          find dl -size -1024c -exec ls -l {} \;
+          find dl -size -1024c -exec rm -f {} \;
 
-    - name: Download package
-      id: package
-      run: |
-        cd openwrt
-        make download -j8
-        find dl -size -1024c -exec ls -l {} \;
-        find dl -size -1024c -exec rm -f {} \;
+      # 步骤7：开始编译 OpenWrt 固件
+      - name: Compile OpenWrt
+        run: |
+          cd openwrt
+          # 查看 CPU 核心数，自动分配编译线程（避免卡死）
+          echo "Compiling OpenWrt firmware..."
+          make -j$(nproc) || make -j1 V=s  # 若多核编译失败，降级为单核并输出详细日志
+          # 检查编译产物是否存在
+          echo "Compile completed, checking firmware files..."
+          ls -lh bin/targets/x86/64/
 
-    - name: Compile the firmware
-      id: compile
-      run: |
-        cd openwrt
-        echo -e "$(nproc) thread compile"
-        make -j$(nproc) || make -j1 || make -j1 V=s
-        echo "status=success" >>$GITHUB_OUTPUT
-        grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
-        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
-        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+      # 步骤8：打包编译产物（便于下载）
+      - name: Package firmware files
+        run: |
+          # 创建产物目录
+          mkdir -p firmware
+          # 复制固件到产物目录
+          cp openwrt/bin/targets/x86/64/*.tar.gz firmware/
+          cp openwrt/bin/targets/x86/64/*.img.gz firmware/
+          cp openwrt/bin/targets/x86/64/*.iso firmware/
+          # 生成固件信息文件
+          echo "Build Time: $(date +%Y-%m-%d_%H:%M:%S)" > firmware/build-info.txt
+          echo "Lean's lede Source: https://github.com/coolsnowwolf/lede" >> firmware/build-info.txt
+          echo "Target Platform: x86_64" >> firmware/build-info.txt
 
-    - name: Check space usage
-      if: (!cancelled())
-      run: df -hT
+      # 步骤9：上传产物到 GitHub Artifacts（临时下载，保留90天）
+      - name: Upload firmware to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenWrt_x86_64_Firmware_${{ github.run_id }}
+          path: firmware/
 
-    - name: Upload bin directory
-      uses: actions/upload-artifact@main
-      if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
-      with:
-        name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
-        path: openwrt/bin
-
-    - name: Organize files
-      id: organize
-      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
-      run: |
-        cd openwrt/bin/targets/*/*
-        rm -rf packages
-        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-        echo "status=success" >>$GITHUB_OUTPUT
-
-    - name: Upload firmware directory
-      uses: actions/upload-artifact@main
-      if: steps.organize.outputs.status == 'success' && !cancelled()
-      with:
-        name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
-        path: ${{ env.FIRMWARE }}
-
- 
-    - name: Delete workflow runs
-      uses: GitRML/delete-workflow-runs@main
-      with:
-        retain_days: 1
-        keep_minimum_runs: 3
-
+      # 步骤10：（可选）发布固件到 GitHub Release（永久保存）
+      - name: Release firmware
+        uses: softprops/action-gh-release@v2
+        if: github.event_name != 'schedule'  # 定时触发不发布，仅手动触发发布
+        with:
+          tag_name: OpenWrt_x86_64_${{ github.run_id }}
+          name: OpenWrt x86_64 Firmware ${{ github.run_id }}
+          body: |
+            - 源码：Lean's lede
+            - 平台：x86_64
+            - 集成插件：Passwall、SmartDNS、Lucky、Adbyby
+            - 编译时间：${{ github.run_at }}
+          files: firmware/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # GitHub 自动生成的令牌，无需手动配置
