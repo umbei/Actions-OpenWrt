@@ -1,4 +1,3 @@
-# Build OpenWrt for x86_64 (Lean's lede)
 name: Build OpenWrt x86_64 (Lean's lede)
 
 on:
@@ -40,16 +39,21 @@ jobs:
           cd openwrt
           ./scripts/feeds update -a
 
-      - name: Add custom plugins
+      - name: Add custom plugins (SSH protocol)
         run: |
+          # 配置 SSH 免交互拉取
+          mkdir -p ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          
           cd openwrt
           # Passwall
-          git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall-packages.git package/passwall-packages
-          git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall.git package/passwall
+          git clone --depth=1 git@github.com:xiaorouji/openwrt-passwall-packages.git package/passwall-packages
+          git clone --depth=1 git@github.com:xiaorouji/openwrt-passwall.git package/passwall
           # Lucky
-          git clone --depth=1 https://github.com/gdy666/luci-app-lucky.git package/lucky
+          git clone --depth=1 git@github.com:gdy666/luci-app-lucky.git package/lucky
           # SmartDNS
-          git clone --depth=1 https://github.com/pymumu/luci-app-smartdns.git package/smartdns
+          git clone --depth=1 git@github.com:pymumu/luci-app-smartdns.git package/smartdns
           # Install feeds
           ./scripts/feeds install -a
 
