@@ -1,5 +1,5 @@
 # 工作流名称（GitHub Actions 页面显示）
-name: Build OpenWrt for x86_64 (Lean's lede)
+name: Build OpenWrt Lean's lede
 
 # 触发条件：手动触发 + 定时触发（可选）
 # on:
