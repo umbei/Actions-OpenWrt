@@ -1,16 +1,7 @@
-name: Build OpenWrt for x86-64 (Lean's LEDE) with VMDK
+name: Build OpenWrt for x86-64 (Lean's LEDE) - 旁路由专用
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: '分支选择 (master = 最新版 / 24.10 = 稳定版)'
-        required: true
-        default: 'master'
-        type: choice
-        options:
-          - master
-          - 24.10
 
 jobs:
   build:
@@ -30,9 +21,6 @@ jobs:
       run: |
         git clone https://github.com/coolsnowwolf/lede
         cd lede
-        if [ "${{ github.event.inputs.version }}" != "master" ]; then
-          git checkout ${{ github.event.inputs.version }}
-        fi
 
     - name: 更新 Feeds
       run: |
@@ -40,7 +28,7 @@ jobs:
         ./scripts/feeds update -a
         ./scripts/feeds install -a
 
-    - name: 配置固件 (x86-64 + 四个插件 + 10.0.0.101 + 关闭DHCP + VMDK)
+    - name: 配置固件 (x86-64 + 旁路由优化)
       run: |
         cd lede
         
@@ -49,10 +37,10 @@ jobs:
         echo 'CONFIG_TARGET_x86_64=y' >> .config
         echo 'CONFIG_TARGET_x86_64_Generic=y' >> .config
         
-        # 2. 启用 VMDK 虚拟机格式 (VMware)
+        # 2. 启用 VMDK 虚拟机格式
         echo 'CONFIG_VMDK_IMAGES=y' >> .config
         
-        # 3. 开启 LuCI 界面
+        # 3. 开启 LuCI
         echo 'CONFIG_PACKAGE_luci=y' >> .config
         echo 'CONFIG_PACKAGE_luci-ssl-openssl=y' >> .config
         echo 'CONFIG_PACKAGE_luci-i18n-base-zh-cn=y' >> .config
@@ -79,12 +67,23 @@ jobs:
         # 6. 修改默认IP为 10.0.0.101
         sed -i 's/192.168.1.1/10.0.0.101/g' package/base-files/files/bin/config_generate
         
-        # 7. 关闭 DHCP
+        # ========== 7. 旁路由专属优化 ==========
+        
+        # 关闭 DHCP (旁路由不需要分配IP)
         echo 'CONFIG_PACKAGE_dnsmasq_DHCP=n' >> .config
         echo 'CONFIG_PACKAGE_dnsmasq_DHCPv6=n' >> .config
         echo 'CONFIG_PACKAGE_odhcpd-ipv6only=n' >> .config
         
-        # 8. 分区大小调整 (2GB)
+        # 关闭防火墙的 WAN 区域 (旁路由只需要 LAN)
+        echo 'CONFIG_PACKAGE_luci-app-firewall=y' >> .config
+        echo 'CONFIG_PACKAGE_firewall=n' >> .config
+        echo 'CONFIG_PACKAGE_firewall4=n' >> .config
+        
+        # 启用 IP 转发优化 (提高旁路由性能)
+        echo 'CONFIG_PACKAGE_kmod-ipt-offload=y' >> .config
+        echo 'CONFIG_PACKAGE_kmod-nf-flow=y' >> .config
+        
+        # 8. 分区大小 2GB
         sed -i 's/CONFIG_TARGET_ROOTFS_PARTSIZE=300/CONFIG_TARGET_ROOTFS_PARTSIZE=2048/g' .config 2>/dev/null || \
         echo 'CONFIG_TARGET_ROOTFS_PARTSIZE=2048' >> .config
         
@@ -102,10 +101,10 @@ jobs:
         cd lede
         make -j$(nproc) || make -j1 V=s
 
-    - name: 上传固件和VMDK虚拟机文件
+    - name: 上传固件和VMDK
       uses: actions/upload-artifact@v4
       with:
-        name: lede-x64-vmdk
+        name: lede-x64-vmdk-bypass
         path: |
           lede/bin/targets/x86/64/*.vmdk
           lede/bin/targets/x86/64/*.img.gz
