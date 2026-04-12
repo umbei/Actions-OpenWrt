@@ -6,7 +6,7 @@
 # https://github.com/P3TERX/Actions-OpenWrt
 # 描述: 使用 GitHub Actions 编译 OpenWrt 固件
 
-name: lede-OpenWrt
+name: OpenWrt
 
 on:
   repository_dispatch:  # 仓库触发
