@@ -6,10 +6,7 @@
 # https://github.com/P3TERX/Actions-OpenWrt
 # Description: Build OpenWrt using GitHub Actions
 
-name: build-OpenWrt (lede)
-
-
-
+name: build-OpenWrt lede
 env:
   REPO_URL: https://github.com/coolsnowwolf/lede.git
   REPO_BRANCH: 20220505
