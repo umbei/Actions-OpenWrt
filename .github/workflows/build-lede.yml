@@ -1,205 +1,280 @@
-# 版权信息 (c) 2019-2020 P3TERX <https://p3terx.com>
-#
-# 这是一个免费软件，遵循 MIT 许可证
-# 详情请查看 /LICENSE 文件
-#
-# https://github.com/P3TERX/Actions-OpenWrt
-# 描述: 使用 GitHub Actions 编译 OpenWrt 固件
+# 文件名: .github/workflows/build-openwrt.yml
+# 描述: 通过 GitHub Actions 自动编译 OpenWrt 固件
 
-name: OpenWrt
+name: 编译 OpenWrt 固件
 
 on:
-  repository_dispatch:  # 仓库触发
-  workflow_dispatch:    # 手动触发
+  # 允许手动触发
+  workflow_dispatch:
     inputs:
-      ssh:
-        description: 'SSH 连接到 Actions 运行环境'
+      custom_config:
+        description: '自定义配置文件名称'
+        required: false
+        default: '.config'
+      clean_build:
+        description: '清理编译缓存'
         required: false
         default: 'false'
+        type: boolean
+
+  # 每周自动编译（周日凌晨2点）
+  schedule:
+    - cron: '0 2 * * 0'
+
+  # 代码推送时触发
+  push:
+    branches: [ main, master ]
+    paths:
+      - '.config'
+      - 'diy-part1.sh'
+      - 'diy-part2.sh'
+      - 'feeds.conf.default'
+
+# 取消正在进行的运行
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
-  REPO_URL: https://github.com/umbei/lede    # 源码仓库地址
-  REPO_BRANCH: master                         # 源码分支
-  FEEDS_CONF: feeds.conf.default              # feeds 配置文件
-  CONFIG_FILE: .config                        # 编译配置文件
-  DIY_P1_SH: diy-part1.sh                     # 自定义脚本1
-  DIY_P2_SH: diy-part2.sh                     # 自定义脚本2
-  UPLOAD_BIN_DIR: false                       # 是否上传 bin 目录
-  UPLOAD_FIRMWARE: true                       # 是否上传固件
-  UPLOAD_COWTRANSFER: false                   # 是否上传到 cowtransfer
-  UPLOAD_WETRANSFER: false                    # 是否上传到 wetransfer
-  UPLOAD_RELEASE: false                       # 是否创建 GitHub Release
-  TZ: Asia/Shanghai                           # 时区设置
+  # 源码配置
+  REPO_URL: https://github.com/coolsnowwolf/lede
+  REPO_BRANCH: master
+  
+  # 文件配置
+  DIY_P1_SH: diy-part1.sh
+  DIY_P2_SH: diy-part2.sh
+  FEEDS_CONF: feeds.conf.default
+  
+  # 上传配置
+  UPLOAD_FIRMWARE: true
+  UPLOAD_RELEASE: false
+  
+  # 系统配置
+  TZ: Asia/Shanghai
 
 jobs:
   build:
-    runs-on: ubuntu-latest    # 运行环境
+    runs-on: ubuntu-22.04
+    
+    # 编译超时时间（6小时）
+    timeout-minutes: 360
 
     steps:
+    # 步骤1: 检出代码
     - name: 检出代码
-      uses: actions/checkout@main
-      
-    - name: 检查服务器性能
-      run: |
-        echo "警告⚠"
-        echo "分配的服务器性能有限，若选择的插件过多，务必注意CPU性能！"
-        echo -e "已知CPU型号（降序）：8370C，8272CL，8171M，E5-2673 \n"
-        echo "--------------------------CPU信息--------------------------"
-        echo "CPU物理数量：$(cat /proc/cpuinfo | grep "physical id" | sort | uniq | wc -l)"
-        echo -e "CPU核心信息：$(cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c) \n"
-        echo "--------------------------内存信息--------------------------"
-        echo "已安装内存详细信息："
-        echo -e "$(sudo lshw -short -C memory | grep GiB) \n"
-        echo "--------------------------硬盘信息--------------------------"
-        echo "硬盘数量：$(ls /dev/sd* | grep -v [1-9] | wc -l)" && df -hT
+      uses: actions/checkout@v4
 
+    # 步骤2: 初始化编译环境
     - name: 初始化编译环境
-      env:
-        DEBIAN_FRONTEND: noninteractive
       run: |
-        sudo -E apt-get -qq update
-        sudo -E apt-get -qq full-upgrade -y
-        sudo -E apt-get -qq install -y build-essential clang flex bison g++ gawk \
-          gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev \
-          python3 python3-dev python3-pip rsync swig unzip zlib1g-dev \
-          file wget qemu-utils time
-        sudo -E apt-get -qq autoremove --purge
-        sudo -E apt-get -qq clean
+        sudo apt-get update
+        sudo apt-get upgrade -y
+        sudo apt-get install -y \
+          build-essential \
+          gcc g++ \
+          make cmake \
+          flex bison \
+          gawk \
+          gettext \
+          git \
+          libncurses5-dev \
+          libssl-dev \
+          python3 python3-dev \
+          rsync \
+          swig \
+          unzip \
+          wget \
+          zlib1g-dev \
+          file \
+          time
+        sudo apt-get autoremove --purge -y
+        sudo apt-get clean
         sudo timedatectl set-timezone "$TZ"
-        sudo mkdir -p /workdir
-        sudo chown $USER:$GROUPS /workdir
 
-    - name: 克隆源代码
-      working-directory: /workdir
+    # 步骤3: 创建缓存目录
+    - name: 创建编译目录
       run: |
-        df -hT $PWD
-        git clone $REPO_URL -b $REPO_BRANCH openwrt
-        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
+        mkdir -p /home/runner/openwrt
+        mkdir -p /home/runner/ccache
 
+    # 步骤4: 缓存下载的源码包
+    - name: 缓存下载目录
+      uses: actions/cache@v3
+      with:
+        path: /home/runner/openwrt/dl
+        key: ${{ runner.os }}-dl-${{ hashFiles('openwrt/.config') }}
+        restore-keys: |
+          ${{ runner.os }}-dl-
+
+    # 步骤5: 缓存编译缓存
+    - name: 缓存编译文件
+      uses: actions/cache@v3
+      with:
+        path: /home/runner/ccache
+        key: ${{ runner.os }}-ccache-${{ hashFiles('openwrt/.config') }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-
+
+    # 步骤6: 克隆源码
+    - name: 克隆源码
+      run: |
+        git clone --depth 1 $REPO_URL -b $REPO_BRANCH /home/runner/openwrt
+        ln -sf /home/runner/openwrt $GITHUB_WORKSPACE/openwrt
+
+    # 步骤7: 加载自定义 feeds
     - name: 加载自定义 feeds
       run: |
-        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
-        chmod +x $DIY_P1_SH
-        cd openwrt
-        $GITHUB_WORKSPACE/$DIY_P1_SH
+        [ -e $FEEDS_CONF ] && cp $FEEDS_CONF openwrt/feeds.conf.default
+        [ -e $DIY_P1_SH ] && chmod +x $DIY_P1_SH && cd openwrt && $GITHUB_WORKSPACE/$DIY_P1_SH
 
+    # 步骤8: 更新 feeds
     - name: 更新 feeds
       run: cd openwrt && ./scripts/feeds update -a
 
+    # 步骤9: 安装 feeds
     - name: 安装 feeds
       run: cd openwrt && ./scripts/feeds install -a
 
+    # 步骤10: 加载自定义配置
     - name: 加载自定义配置
       run: |
-        [ -e files ] && mv files openwrt/files
-        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
-        chmod +x $DIY_P2_SH
-        cd openwrt
-        $GITHUB_WORKSPACE/$DIY_P2_SH
+        [ -e files ] && cp -r files openwrt/files
+        [ -e ${{ github.event.inputs.custom_config }} ] && cp ${{ github.event.inputs.custom_config }} openwrt/.config || echo "使用默认配置"
+        [ -e $DIY_P2_SH ] && chmod +x $DIY_P2_SH && cd openwrt && $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: SSH 连接到 Actions 环境
-      uses: P3TERX/ssh2actions@v1.0.0
-      if: (github.event.inputs.ssh == 'true' && github.event.inputs.ssh  != 'false') || contains(github.event.action, 'ssh')
-      env:
-        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-
+    # 步骤11: 下载软件包
     - name: 下载软件包
-      id: package
+      id: download
       run: |
         cd openwrt
-        export FORCE=1
+        
+        # 生成配置
         make defconfig
-        make download -j8
-        find dl -size -1024c -exec ls -l {} \;
+        
+        # 下载软件包
+        make download -j$(nproc)
+        
+        # 清理无效下载
         find dl -size -1024c -exec rm -f {} \;
+        
+        echo "下载完成，软件包数量: $(find dl -type f | wc -l)"
 
+    # 步骤12: 编译固件
     - name: 编译固件
       id: compile
       run: |
         cd openwrt
-        export FORCE=1
-        echo -e "$(nproc) thread compile"
+        
+        # 设置 ccache
+        export PATH="/usr/lib/ccache:$PATH"
+        export CCACHE_DIR="/home/runner/ccache"
+        ccache -s
+        
+        # 显示编译信息
+        echo "CPU核心数: $(nproc)"
+        echo "开始编译时间: $(date '+%Y-%m-%d %H:%M:%S')"
+        
+        # 开始编译
+        START_TIME=$(date +%s)
         make -j$(nproc) || make -j1 || make -j1 V=s
-        echo "status=success" >>$GITHUB_OUTPUT
-        grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
-        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
-        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+        END_TIME=$(date +%s)
+        
+        # 编译耗时
+        COST_TIME=$((END_TIME - START_TIME))
+        echo "编译完成时间: $(date '+%Y-%m-%d %H:%M:%S')"
+        echo "编译耗时: $((COST_TIME / 60)) 分 $((COST_TIME % 60)) 秒"
+        
+        # 检查编译结果
+        if [ -d bin/targets ]; then
+          echo "status=success" >> $GITHUB_OUTPUT
+          
+          # 获取设备名称
+          grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
+          [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
+          echo "FILE_DATE=_$(date +'%Y%m%d%H%M')" >> $GITHUB_ENV
+        else
+          echo "status=failed" >> $GITHUB_OUTPUT
+          echo "编译失败！"
+          exit 1
+        fi
+        
+        # 显示缓存统计
+        ccache -s
 
+    # 步骤13: 检查磁盘空间
     - name: 检查磁盘空间
       if: always()
-      run: df -hT
+      run: |
+        echo "磁盘使用情况:"
+        df -hT
 
+    # 步骤14: 上传完整 bin 目录
     - name: 上传 bin 目录
-      uses: actions/upload-artifact@main
-      if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
+      uses: actions/upload-artifact@v4
+      if: steps.compile.outputs.status == 'success'
       with:
-        name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        name: openwrt-bin-${{ env.FILE_DATE }}
         path: openwrt/bin
+        retention-days: 7
 
+    # 步骤15: 整理固件文件
     - name: 整理固件文件
       id: organize
-      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
+      if: env.UPLOAD_FIRMWARE == 'true' && steps.compile.outputs.status == 'success'
       run: |
         cd openwrt/bin/targets/*/*
-        rm -rf packages
+        rm -rf packages 2>/dev/null || true
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-        echo "status=success" >>$GITHUB_OUTPUT
+        echo "status=success" >> $GITHUB_OUTPUT
+        echo "固件目录: $PWD"
+        echo "固件列表:"
+        ls -lh *.bin *.img *.gz *.trx 2>/dev/null || echo "未找到固件文件"
 
-    - name: 上传固件目录
-      uses: actions/upload-artifact@main
-      if: steps.organize.outputs.status == 'success' && !cancelled()
+    # 步骤16: 上传固件目录
+    - name: 上传固件
+      uses: actions/upload-artifact@v4
+      if: steps.organize.outputs.status == 'success'
       with:
-        name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        name: openwrt-firmware-${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: ${{ env.FIRMWARE }}
+        retention-days: 7
 
-    - name: 上传固件到 cowtransfer
-      id: cowtransfer
-      if: steps.organize.outputs.status == 'success' && env.UPLOAD_COWTRANSFER == 'true' && !cancelled()
-      run: |
-        curl -fsSL git.io/file-transfer | sh
-        ./transfer cow --block 2621440 -s -p 64 --no-progress ${FIRMWARE} 2>&1 | tee cowtransfer.log
-        echo "::warning file=cowtransfer.com::$(cat cowtransfer.log | grep https)"
-        echo "url=$(cat cowtransfer.log | grep https | cut -f3 -d" ")" >>$GITHUB_OUTPUT
-
-    - name: 上传固件到 WeTransfer
-      id: wetransfer
-      if: steps.organize.outputs.status == 'success' && env.UPLOAD_WETRANSFER == 'true' && !cancelled()
-      run: |
-        curl -fsSL git.io/file-transfer | sh
-        ./transfer wet -s -p 16 --no-progress ${FIRMWARE} 2>&1 | tee wetransfer.log
-        echo "::warning file=wetransfer.com::$(cat wetransfer.log | grep https)"
-        echo "url=$(cat wetransfer.log | grep https | cut -f3 -d" ")" >>$GITHUB_OUTPUT
-
-    - name: 生成 Release 标签
-      id: tag
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
-      run: |
-        echo "::set-output name=release_tag::$(date +"%Y.%m.%d-%H%M")"
-        touch release.txt
-        [ $UPLOAD_COWTRANSFER = true ] && echo "🔗 [Cowtransfer](${{ steps.cowtransfer.outputs.url }})" >> release.txt
-        [ $UPLOAD_WETRANSFER = true ] && echo "🔗 [WeTransfer](${{ steps.wetransfer.outputs.url }})" >> release.txt
-        echo "status=success" >>$GITHUB_OUTPUT
-
-    - name: 上传固件到 Release
+    # 步骤17: 创建 Release
+    - name: 创建 Release
       uses: softprops/action-gh-release@v1
-      if: steps.tag.outputs.status == 'success' && !cancelled()
+      if: env.UPLOAD_RELEASE == 'true' && steps.compile.outputs.status == 'success'
+      with:
+        tag_name: openwrt-${{ env.FILE_DATE }}
+        name: OpenWrt 固件 ${{ env.FILE_DATE }}
+        body: |
+          ## 自动编译的 OpenWrt 固件
+          
+          ### 编译信息
+          - 编译时间: $(date '+%Y-%m-%d %H:%M:%S')
+          - 源码分支: ${{ env.REPO_BRANCH }}
+          
+          ### 固件说明
+          - 固件保存在 Artifacts 中，可下载附件
+          - 刷机有风险，请谨慎操作
+          
+          ### 注意事项
+          - 建议刷机前备份原固件
+          - 首次刷机建议不保留配置
+        files: ${{ env.FIRMWARE }}/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ steps.tag.outputs.release_tag }}
-        body_path: release.txt
-        files: ${{ env.FIRMWARE }}/*
 
-    - name: 删除旧的 workflow 运行记录
+    # 步骤18: 清理旧的工作流运行记录
+    - name: 清理旧记录
       uses: GitRML/delete-workflow-runs@main
       with:
-        retain_days: 1
-        keep_minimum_runs: 3
+        retain_days: 30
+        keep_minimum_runs: 5
 
-    - name: 删除旧的 Releases
-      uses: dev-drprasad/delete-older-releases@v0.1.0
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+    # 步骤19: 清理旧的 Release
+    - name: 清理旧 Release
+      uses: dev-drprasad/delete-older-releases@v0.3.2
+      if: env.UPLOAD_RELEASE == 'true'
       with:
         keep_latest: 3
         delete_tags: true
